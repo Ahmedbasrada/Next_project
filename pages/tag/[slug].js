@@ -2,10 +2,13 @@ import { usePosts } from 'hooks/usePost'
 import { MainLayout } from 'layouts'
 import QList from 'components/QList'
 import Pages from 'components/Pages'
-import { makeStyles, ButtonGroup, Button, Box, Typography } from '@material-ui/core'
+import { makeStyles, Button, Box, Typography } from '@material-ui/core'
 import { FormattedMessage } from 'react-intl'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
+import Head from 'next/head'
+import Tag from 'models/tag'
+import dbConnect from 'utils/dbConnect'
 
 const useStyles = makeStyles((theme) => ({
     titleContainer: {
@@ -18,17 +21,19 @@ const useStyles = makeStyles((theme) => ({
     }
 }))
 
-export default function Home() {
+export default function Show({params: tag}) {
     const classes = useStyles()
     const router = useRouter()
     const page = router.query.page || 1
-    const sort = router.query.sort || -1
-    const {data} = usePosts({page, sort})
+    const {data} = usePosts({page, tag: tag?.id})
     return (
         <MainLayout>
+            <Head>
+                <title>{tag?.name}</title>
+            </Head>
             <Box className={classes.titleContainer}>
                 <Typography variant="h5" className={classes.title}>
-                    <Filters/>
+                    {tag?.name}
                 </Typography>
                 <Box marginY={'auto'}>
                     <Link href={'/question/ask'} passHref>
@@ -44,22 +49,22 @@ export default function Home() {
     )
 }
 
-function Filters() {
-    const router = useRouter()
-    const navigate = (sort) => {
-        router.push({
-            pathname: '/',
-            query: {...router.query, sort}
-        })
+export async function getStaticPaths() {
+    await dbConnect()
+    const items = await Tag.find({}).exec()
+    const paths = items.map(e => ({params: {slug: e.slug.toString()}}))
+    return {
+        paths,
+        fallback: true
     }
-    return (
-        <ButtonGroup size='small'>
-            <Button onClick={() => navigate(-1)}>
-                <FormattedMessage id={'btn.newest'}/>
-            </Button>
-            <Button onClick={() => navigate(1)}>
-                <FormattedMessage id={'btn.oldest'}/>
-            </Button>
-        </ButtonGroup>
-    )
+}
+
+export async function getStaticProps({params}) {
+    await dbConnect()
+    let item = await Tag.findOne({slug: params.slug}).exec()
+    return {
+        props: {
+            params: JSON.parse(JSON.stringify(item))
+        }
+    }
 }
